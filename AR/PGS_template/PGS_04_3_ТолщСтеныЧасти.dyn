@@ -1,0 +1,500 @@
+{
+  "Uuid": "3c9d0464-8643-5ffe-96e5-ab1769818209",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "PGS_04_3_ТолщСтеныЧасти",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [
+    {
+      "Id": "3dd120917d034b70b9284ae3e4dff9e8",
+      "Name": "Название рабочего набора",
+      "Type": "string",
+      "Value": "Тест",
+      "Description": "Создание строки."
+    },
+    {
+      "Id": "c806738167844d6ea3b57d996ffd3379",
+      "Name": "Вы в совместной работе?",
+      "Type": "boolean",
+      "Value": "true",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "Id": "d5c42437ee234b139a644495b7a8be05",
+      "Name": "Название типа стены содержит:",
+      "Type": "string",
+      "Value": "AR_",
+      "Description": "Создание строки."
+    },
+    {
+      "Id": "4d8087f9800242e8b79e89da25ce853d",
+      "Name": "Параметр для записи",
+      "Type": "string",
+      "Value": "АР_Толщина стен",
+      "Description": "Создание строки."
+    }
+  ],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "NodeType": "StringInputNode",
+      "InputValue": "Тест",
+      "Id": "3dd120917d034b70b9284ae3e4dff9e8",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "864f4b1d4b95410e9600caacdd7430b6",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Создание строки."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "c806738167844d6ea3b57d996ffd3379",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "478ea1d227ce4b2495d3cf31e4e21756",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "#Подключение библиотек\nimport clr\nclr.AddReference('ProtoGeometry')\nfrom Autodesk.DesignScript.Geometry import *\nclr.AddReference('RevitAPI')\nfrom Autodesk.Revit.DB import *\nclr.AddReference(\"RevitServices\")\nimport RevitServices\nfrom RevitServices.Persistence import DocumentManager\nfrom RevitServices.Transactions import TransactionManager\nfrom System.Collections.Generic import List\ndoc = DocumentManager.Instance.CurrentDBDocument\n#--------------Взятие элементов------------------------\nwalls = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsNotElementType().ToElements()\nparts = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Parts).WhereElementIsNotElementType().ToElements()\n#Ссылка на BuiltInCategories: http://www.revitapidocs.com/2018.1/ba1c5b30-242f-5fdc-8ea9-ec3b61e6e722.htm\n\n# Создание списка стен\nwallsList = []\nfor wall in walls:\n\twallsList.append(wall)\n\t\n# Создание списка частей\npartsList = []\nfor part in parts:\n\tpartsList.append(part)\n\n# Удаление из списка стен, не принадлежащих рабочему набору IN[1], если верно выражение IN[0]\nif (IN[0] == True):\n\ti = 0\n\twhile i < len(wallsList):\n\t\tif (wallsList[i].get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsValueString() != IN[1]):\n\t\t\twallsList[i] = None\n\t\ti += 1\n\twallsList = list(filter(None, wallsList))\n\n# Удаление из списка частей, не принадлежащих рабочему набору IN[1], если верно выражение IN[0]\nif (IN[0] == True):\n\ti = 0\n\twhile i < len(partsList):\n\t\tif (partsList[i].get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsValueString() != IN[1]):\n\t\t\tpartsList[i] = None\n\t\ti += 1\n\tpartsList = list(filter(None, partsList))\n\n# Удаление из списка многослойных стен\ni = 0\nwhile i < len(wallsList):\n\tif (len(wallsList[i].WallType.GetCompoundStructure().GetLayers()) > 1):\n\t\twallsList[i] = None\n\ti += 1\nwallsList = list(filter(None, wallsList))\n\n# Удаление из списка стен, в названии типа которых нет AR_\ni = 0\nwhile i < len(wallsList):\n\tif not(IN[2] in wallsList[i].get_Parameter(BuiltInParameter.ELEM_TYPE_PARAM).AsValueString()):\n\t\twallsList[i] = None\n\ti += 1\nwallsList = list(filter(None, wallsList))\n\n# Удаление из списка стен, из которых нельзя создать части\ni = 0\nwhile i < len(wallsList):\n\tif not(PartUtils.IsValidForCreateParts(doc, LinkElementId(wallsList[i].Id))):\n\t\twallsList[i] = None\n\ti += 1\nwallsList = list(filter(None, wallsList))\n\n#Список Id стен\nwallsIds = []\nfor wall in wallsList:\n\twallsIds.append(wall.Id)\nIDS = List[ElementId](wallsIds)\n\n#Назначение параметров\nTransactionManager.Instance.ForceCloseTransaction()\ntrans = Transaction(doc, \"Толщина стен и частей\")\ntrans.Start()\n\n#Назначение параметра частям\nparameter = IN[3]\nfor part in partsList:\n\tvalue = str(int(round((part.get_Parameter(BuiltInParameter.DPART_LAYER_WIDTH).AsDouble())*304.8)))\n\tpart.LookupParameter(parameter).Set(value)\n\n#Назначение параметра \nfor wall in wallsList:\n\tvalue = str(int(round(wall.WallType.Width*304.8)))\n\twall.LookupParameter(parameter).Set(value)\n\ntrans.Commit()\n#Назначьте вывод переменной OUT.\nOUT = wallsList, partsList",
+      "Engine": "IronPython2",
+      "VariableInputPorts": true,
+      "Id": "46b60f43ca784eba9f8b041b484dd09c",
+      "Inputs": [
+        {
+          "Id": "3b833019aac2425b85356805014781ee",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "162f1b7ba0974520a4becdd00ff3dca4",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "3c2092962ad44cc897ee342481040fd4",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "3ad493676f8140d085c3b33e217cbe17",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "6aba77b08fff4964ba80e32cafa34edb",
+          "Name": "OUT",
+          "Description": "Результат сценария Python",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выполнение встроенного сценария Python."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "NodeType": "StringInputNode",
+      "InputValue": "AR_",
+      "Id": "d5c42437ee234b139a644495b7a8be05",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "12ccaa755d524d22998e6956df97a66d",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Создание строки."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "NodeType": "StringInputNode",
+      "InputValue": "АР_Толщина стен",
+      "Id": "4d8087f9800242e8b79e89da25ce853d",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "15c89c6edc6148518dcc08f5d0a51b32",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Создание строки."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "864f4b1d4b95410e9600caacdd7430b6",
+      "End": "162f1b7ba0974520a4becdd00ff3dca4",
+      "Id": "0f7d46a09e83458f9c31a9c40322cfac"
+    },
+    {
+      "Start": "478ea1d227ce4b2495d3cf31e4e21756",
+      "End": "3b833019aac2425b85356805014781ee",
+      "Id": "8cb06788ddaa43fca5721ab53184ab3e"
+    },
+    {
+      "Start": "12ccaa755d524d22998e6956df97a66d",
+      "End": "3c2092962ad44cc897ee342481040fd4",
+      "Id": "706c5eebdc05489bb79bae6842bad251"
+    },
+    {
+      "Start": "15c89c6edc6148518dcc08f5d0a51b32",
+      "End": "3ad493676f8140d085c3b33e217cbe17",
+      "Id": "4f4a52da532643649b552a1829abf08b"
+    }
+  ],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.10.1.3976",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Фоновый просмотр",
+      "EyeX": 10610.280018640333,
+      "EyeY": 11542.106181398876,
+      "EyeZ": 5906.7561991031707,
+      "LookX": 9103.0521743405152,
+      "LookY": -10016.659332122103,
+      "LookZ": -12909.483576278048,
+      "UpX": 0.19709960447070776,
+      "UpY": 0.939692620785915,
+      "UpZ": -0.27951659048794181
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Название рабочего набора",
+        "Id": "3dd120917d034b70b9284ae3e4dff9e8",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 789.77287063122458,
+        "Y": 1584.4533319441923
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Вы в совместной работе?",
+        "Id": "c806738167844d6ea3b57d996ffd3379",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 791.90593522662766,
+        "Y": 1519.4524994804997
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Python Script",
+        "Id": "46b60f43ca784eba9f8b041b484dd09c",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1381.2674005167305,
+        "Y": 1578.8560828544178
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Название типа стены содержит:",
+        "Id": "d5c42437ee234b139a644495b7a8be05",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 788.39999081886731,
+        "Y": 1657.2397648356559
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Параметр для записи",
+        "Id": "4d8087f9800242e8b79e89da25ce853d",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 788.47559128588227,
+        "Y": 1722.9416019486637
+      }
+    ],
+    "Annotations": [
+      {
+        "Id": "a6538600177a47e3aca29a100e7d534d",
+        "Title": "ИМПОРТ",
+        "Nodes": [
+          "2b696b60e6ac42ce860863c23c5d0e88"
+        ],
+        "Left": 1804.0713109425421,
+        "Top": 275.20405472045559,
+        "Width": 280.00000000000023,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 328.20405472045559,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFD4B6DB"
+      },
+      {
+        "Id": "a6a53b11aa9c42b6b4712e9b674865d4",
+        "Title": "ВЫВОД",
+        "Nodes": [
+          "56bd254064e44ba491470c679de260ce"
+        ],
+        "Left": 2182.9720627483121,
+        "Top": 273.78197747208515,
+        "Width": 312.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 326.78197747208515,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFFF7BAC"
+      },
+      {
+        "Id": "b5f8c8721e7f4f84b5b42eece60332cb",
+        "Title": "PYTHON",
+        "Nodes": [
+          "14c51851ec08414f9e7b3c3e19d92a93"
+        ],
+        "Left": 1411.2782064742958,
+        "Top": 279.5557350076117,
+        "Width": 314.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 332.5557350076117,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFB9F9E1"
+      },
+      {
+        "Id": "0cf3a015011b43aab2e9a770929cd2ff",
+        "Title": "ВХОДНЫЕ ДАННЫЕ",
+        "Nodes": [
+          "dc0b72d5be484dc79540eb94427ecbec"
+        ],
+        "Left": 1028.2778662375829,
+        "Top": 276.20705083066264,
+        "Width": 314.0,
+        "Height": 174.0,
+        "FontSize": 36.0,
+        "InitialTop": 372.20705083066264,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 86.0,
+        "Background": "#FFFFAA45"
+      },
+      {
+        "Id": "f6efb46b7f4d4b20a99c7676caa58199",
+        "Title": "ПРОЕКТ",
+        "Nodes": [
+          "2fa1defa991944c683bae455caaf2cba"
+        ],
+        "Left": 698.30850229875273,
+        "Top": 273.01418636457061,
+        "Width": 281.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 326.01418636457061,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFA4E1FF"
+      },
+      {
+        "Id": "1d6200ae184149679d5f1993a7fb61ff",
+        "Title": "<Имя проекта>",
+        "Nodes": [
+          "b3e79b1cb866489489842b33a72b90dd"
+        ],
+        "Left": 375.01623758926871,
+        "Top": 269.90914484735879,
+        "Width": 288.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 322.90914484735879,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FF48B9FF"
+      },
+      {
+        "Id": "d21cd8b70c6e484a823d6ab34931079c",
+        "Title": "Совместная работа",
+        "Nodes": [
+          "c806738167844d6ea3b57d996ffd3379",
+          "3dd120917d034b70b9284ae3e4dff9e8",
+          "d5c42437ee234b139a644495b7a8be05",
+          "4d8087f9800242e8b79e89da25ce853d"
+        ],
+        "Left": 778.39999081886731,
+        "Top": 1423.4524994804997,
+        "Width": 289.0,
+        "Height": 367.489102468164,
+        "FontSize": 36.0,
+        "InitialTop": 1519.4524994804997,
+        "InitialHeight": 348.489102468164,
+        "TextblockHeight": 86.0,
+        "Background": "#FFFFAA45"
+      },
+      {
+        "Id": "0dd9a292efb648fb89ac35520e1f87dc",
+        "Title": "Основной код",
+        "Nodes": [
+          "46b60f43ca784eba9f8b041b484dd09c"
+        ],
+        "Left": 1371.2674005167305,
+        "Top": 1482.8560828544178,
+        "Width": 177.5,
+        "Height": 278.0,
+        "FontSize": 36.0,
+        "InitialTop": 1578.8560828544178,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 86.0,
+        "Background": "#FFB9F9E1"
+      },
+      {
+        "Id": "56bd254064e44ba491470c679de260ce",
+        "Title": "Используйте этот цвет группы для узлов, применяемых с целью создания элементов Revit.\r\n",
+        "Nodes": [],
+        "Left": 2192.9720627483121,
+        "Top": 326.78197747208515,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "14c51851ec08414f9e7b3c3e19d92a93",
+        "Title": "Используйте этот цвет группы для узлов Python и других узлов, связанных со сценарием.\r\n",
+        "Nodes": [],
+        "Left": 1421.2782064742958,
+        "Top": 332.5557350076117,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "2b696b60e6ac42ce860863c23c5d0e88",
+        "Title": "Используйте этот цвет группы для узлов, применяемых с целью импорта геометрии.\r\n",
+        "Nodes": [],
+        "Left": 1814.0713109425421,
+        "Top": 328.20405472045559,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "dc0b72d5be484dc79540eb94427ecbec",
+        "Title": "Используйте этот цвет группы для входных данных программ (регуляторы, блоки кода и т.д.).\r\n",
+        "Nodes": [],
+        "Left": 1038.2778662375829,
+        "Top": 372.20705083066264,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "2fa1defa991944c683bae455caaf2cba",
+        "Title": "Используйте этот цвет группы для функций программы.\r\n",
+        "Nodes": [],
+        "Left": 708.30850229875273,
+        "Top": 326.01418636457061,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "b3e79b1cb866489489842b33a72b90dd",
+        "Title": "Описание проекта и назначение программы Dynamo\r\n",
+        "Nodes": [],
+        "Left": 385.01623758926871,
+        "Top": 322.90914484735879,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      }
+    ],
+    "X": -712.85601862886108,
+    "Y": -1262.9655036623196,
+    "Zoom": 1.0630674077482141
+  }
+}

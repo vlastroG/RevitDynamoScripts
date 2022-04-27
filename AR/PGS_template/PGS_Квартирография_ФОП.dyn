@@ -1,0 +1,328 @@
+{
+  "Uuid": "3c9d0464-8643-5ffe-96e5-ab1769818209",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "PGS_Квартирография_ФОП",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [
+    {
+      "Id": "bdbaa6621f4748a195e2fce6d75e45ab",
+      "Name": "Перезапуск скрипта",
+      "Type": "boolean",
+      "Value": "true",
+      "Description": "Выбор между значениями true и false."
+    }
+  ],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "#Подключение библиотек\nimport clr\nclr.AddReference('ProtoGeometry')\nfrom Autodesk.DesignScript.Geometry import *\nclr.AddReference('RevitAPI')\nfrom Autodesk.Revit.DB import *\nclr.AddReference(\"RevitServices\")\nimport RevitServices\nfrom RevitServices.Persistence import DocumentManager\nfrom RevitServices.Transactions import TransactionManager\ndoc = DocumentManager.Instance.CurrentDBDocument\n#--------------Взятие элементов------------------------\nrooms = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType().ToElements()\n#Ссылка на BuiltInCategories: http://www.revitapidocs.com/2018.1/ba1c5b30-242f-5fdc-8ea9-ec3b61e6e722.htm\n\n#--------------Входные данные--------------------\n#ОСНОВНАЯ ЧАСТЬ КОДА\n\n#Присвоение параметров помещениям\n\nlist1 = []\nlist2 = []\nTransactionManager.Instance.EnsureInTransaction(doc)\nfor room in rooms:\n\tvalue = room.LookupParameter(\"Имя\").AsString().ToLower()\n\tvalue2 = room.LookupParameter(\"АР_НомерКвартиры\").AsString()\n\tvalue3 = room.LookupParameter(\"Площадь\").AsValueString()\n\tvalue4 = room.LookupParameter(\"Комментарии\").AsString()\n\tvalue5 = room.LookupParameter(\"АР_ТипПомещения\").AsInteger()\n\tvalue6 = room.LookupParameter(\"АР_КолвоКомнат\").AsInteger()\n\ttype1 = [\"комната\", \"гостиная\", \"спальня\"]\n\ttype2 = [\"кухня\", \"столовая\", \"с.у.\", \"с/у\", \"ванная с санузом\", \"санузел\", \"ванная\", \"душевая\", \"офисное помещение\", \"богодельня\", \"холл\", \"коридор\", \"прихожая\", \"гардероб\", \"тамбур\", \"лестница\", \"кухня-столовая\"]\n\ttype3 = [\"лоджия\"]\n\ttype4 = [\"балкон\", \"терраса\"]\n\ttype5 = [\"вестибюль\", \"лестничная клетка\", \"лифтовая шахта\", \"лифтовый холл\"]\n\tlist1.append(value5)\n\tlist2.append(value2)\n\tif \"нежилая\" == value4:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(2)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\n\telif \"общий\" == value4:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(5)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\n\telif \"кухня-гостиная\" in value:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(1)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\n\telif value in type2:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(2)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\n\telif value in type1:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(1)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\t\n\telif value in type3:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(3)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(0.5)\n\telif value in type4:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(4)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(0.3)\n\telif value in type5:\n\t\troom.LookupParameter(\"АР_ТипПомещения\").Set(5)\n\t\troom.LookupParameter(\"АР_КоэффПлощади\").Set(1)\n\telse:\n\t\tvalue\n\t\t\n#Получение списка уникальных номеров квартир в проекте\ndef get_unique_numbers(list2):\n\tlist_of_unique = []\n\tunique_numbers = set(list2)\n\tfor number in unique_numbers:\n\t\tlist_of_unique.append(number)\n\treturn list_of_unique\n\n#Готовый список уникальных номеров квартир\napartments = get_unique_numbers(list2)\n\n#Количество жилых комнат по квартирам\nrooms_liv_count = []\nfor apartment in apartments:\n\trooms_liv = []\n\tfor room in rooms:\n\t\tif (room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment) and room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 1):\n\t\t\trooms_liv.append(room)\n\tcount = len(rooms_liv)\n\trooms_liv_count.append(count)\n\n#Создание словаря количества жилых комнат на основе номеров квартир\ndictionary = dict(zip(apartments, rooms_liv_count))\n\n#Назначение параметра количества жилых комнат жилым помещениям\nrooms_living = []\nfor room in rooms:\n\tif room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 1:\n\t\trooms_living.append(room)\n\tapartment_number = room.LookupParameter(\"АР_НомерКвартиры\").AsString()\n\troom.LookupParameter(\"АР_КолвоКомнат\").Set(dictionary.get(apartment_number))\n\t\n#получение жилой площади квартир\n\n################################################################################\n\n#Список всех жилых помещений в проекте\nall_liv_rooms = []\nfor room in rooms:\n\tif room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 1:\n\t\tall_liv_rooms.append(room)\n\t\t\n#Список жилой площади квартир\nareas_list = []\nfor apartment in apartments:\n\tone_apartment_area = 0\n\tfor room in all_liv_rooms:\n\t\tif room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment):\n\t\t\troom_area = room.LookupParameter(\"Площадь\").AsDouble()*(0.3048**2)\n\t\t\tone_apartment_area = one_apartment_area + room_area\n\tareas_list.append(one_apartment_area)\n\t\n#Словарь номеров квартир и площади жилых помещений\ndictionary_liv = dict(zip(apartments, areas_list))\n\n#Назначение жилой площади к помещениям в квартирах\nfor room in all_liv_rooms:\n\tapartment_number = room.LookupParameter(\"АР_НомерКвартиры\").AsString()\n\tdict_liv = dictionary_liv.get(apartment_number) / (0.3048**2)\n\troom.LookupParameter(\"АР_ПлощКвЖилая\").Set(dict_liv)\n\t\n#Список жилых и нежилых помещений\nall_unliv_rooms = []\nfor room in rooms:\n\tif room.LookupParameter(\"АР_ТипПомещения\").AsInteger() < 3:\n\t\tall_unliv_rooms.append(room)\n\t\t\n#Список общих площадей квартир\nareas_unliv_list = []\nfor apartment in apartments:\n\tone_apartment_unliv_area = 0\n\tfor room in all_unliv_rooms:\n\t\tif room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment):\n\t\t\troom_unliv_area = room.LookupParameter(\"Площадь\").AsDouble()*(0.3048**2)\n\t\t\tone_apartment_unliv_area = one_apartment_unliv_area + room_unliv_area\n\tareas_unliv_list.append(one_apartment_unliv_area)\n\t\n#Словарь номеров квартир и площади жилых и нежилых помещений\ndictionary_unliv = dict(zip(apartments, areas_unliv_list))\n\t\n#Назначение общей площади к помещениям в квартирах\nfor room in all_unliv_rooms:\n\tapartment_number = room.LookupParameter(\"АР_НомерКвартиры\").AsString()\n\tdict_unliv = dictionary_unliv.get(apartment_number) / (0.3048**2)\n\troom.LookupParameter(\"АР_ПлощКвартиры\").Set(dict_unliv)\n\t\n#Список площадей из типов помещений 3,4,5\nareas_unliv_cold_rooms_list = []\nfor apartment in apartments:\n\tone_apartment_balkon_area = 0\n\tone_apartment_lodj_area = 0\n\tone_apartment_totalFive_area = 0\n\tone_apartment_coldtotal_area = 0\n\tfor room in rooms:\n\t\tif room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment) and room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 3:\n\t\t\troom_lodj_area = (room.LookupParameter(\"Площадь\").AsDouble()*(0.3048**2)) * room.LookupParameter(\"АР_КоэффПлощади\").AsDouble()\n\t\t\tone_apartment_lodj_area = one_apartment_lodj_area + room_lodj_area\n\t\telif room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment) and room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 4:\n\t\t\troom_balkon_area = (room.LookupParameter(\"Площадь\").AsDouble()*(0.3048**2)) * room.LookupParameter(\"АР_КоэффПлощади\").AsDouble()\n\t\t\tone_apartment_balkon_area = one_apartment_balkon_area + room_balkon_area\n\t\telif room.LookupParameter(\"АР_НомерКвартиры\").AsString() == str(apartment) and room.LookupParameter(\"АР_ТипПомещения\").AsInteger() == 5:\n\t\t\troom_totals_area = (room.LookupParameter(\"Площадь\").AsDouble()*(0.3048**2)) * room.LookupParameter(\"АР_КоэффПлощади\").AsDouble()\n\t\t\tone_apartment_totalFive_area = one_apartment_totalFive_area + room_totals_area\n\t\tone_apartment_coldtotal_area = one_apartment_lodj_area + one_apartment_balkon_area + one_apartment_totalFive_area\n\tareas_unliv_cold_rooms_list.append(one_apartment_coldtotal_area)\n#\nareas_total_list = []\ncount_of_apartments = len(areas_unliv_list)\ni = 0\nwhile i < count_of_apartments:\n\tareas_total_list.append(areas_unliv_cold_rooms_list[i] + areas_unliv_list[i])\n\ti += 1\n\n#Словарь номеров квартир и площадей жилых и нежилых помещений вместе с неотапливаемыми \ndictionary_total_area_apartment = dict(zip(apartments, areas_total_list))\n\n#Назначение общей площади к помещениям в квартирах вместе с неотапливаемыми\nfor apartment in apartments:\n\tfor room in rooms:\n\t\tapartment_number1 = room.LookupParameter(\"АР_НомерКвартиры\").AsString()\n\t\ttotal_area_all = dictionary_total_area_apartment.get(apartment_number1) / (0.3048**2)\n\t\troom.LookupParameter(\"АР_ПлощКвОбщая\").Set(total_area_all)\n\nTransactionManager.Instance.TransactionTaskDone()\n\n#Назначьте вывод переменной OUT.\nOUT = get_unique_numbers(list2), areas_unliv_cold_rooms_list, areas_unliv_list, areas_total_list",
+      "Engine": "IronPython2",
+      "VariableInputPorts": true,
+      "Id": "11a53809c91847adb18a92e6841ffa47",
+      "Inputs": [
+        {
+          "Id": "855dee169e2945ee8cb9af156d1b9b76",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "dbe7df3dc78847b38149028d74650998",
+          "Name": "OUT",
+          "Description": "Результат сценария Python",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выполнение встроенного сценария Python."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "bdbaa6621f4748a195e2fce6d75e45ab",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "f487b0dc34a145ef9d4d2ef2a17b8a3c",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выбор между значениями true и false."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "f487b0dc34a145ef9d4d2ef2a17b8a3c",
+      "End": "855dee169e2945ee8cb9af156d1b9b76",
+      "Id": "399b6953553449debb82440562b774eb"
+    }
+  ],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.10.1.3976",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Фоновый просмотр",
+      "EyeX": 10610.280018640333,
+      "EyeY": 11542.106181398876,
+      "EyeZ": 5906.7561991031707,
+      "LookX": 9103.0521743405152,
+      "LookY": -10016.659332122103,
+      "LookZ": -12909.483576278048,
+      "UpX": 0.19709960447070776,
+      "UpY": 0.939692620785915,
+      "UpZ": -0.27951659048794181
+    },
+    "NodeViews": [
+      {
+        "Id": "11a53809c91847adb18a92e6841ffa47",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Name": "Python Script",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": 1407.6521335561126,
+        "Y": 796.85495360600453
+      },
+      {
+        "Id": "bdbaa6621f4748a195e2fce6d75e45ab",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Name": "Перезапуск скрипта",
+        "ShowGeometry": true,
+        "Excluded": false,
+        "X": 972.729565312874,
+        "Y": 877.03445565575987
+      }
+    ],
+    "Annotations": [
+      {
+        "Id": "a6538600177a47e3aca29a100e7d534d",
+        "Title": "ИМПОРТ",
+        "Nodes": [
+          "2b696b60e6ac42ce860863c23c5d0e88"
+        ],
+        "Left": 1804.0713109425421,
+        "Top": 275.20405472045559,
+        "Width": 280.00000000000023,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 328.20405472045559,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFD4B6DB"
+      },
+      {
+        "Id": "a6a53b11aa9c42b6b4712e9b674865d4",
+        "Title": "ВЫВОД",
+        "Nodes": [
+          "56bd254064e44ba491470c679de260ce"
+        ],
+        "Left": 2182.9720627483121,
+        "Top": 273.78197747208515,
+        "Width": 312.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 326.78197747208515,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFFF7BAC"
+      },
+      {
+        "Id": "b5f8c8721e7f4f84b5b42eece60332cb",
+        "Title": "PYTHON",
+        "Nodes": [
+          "14c51851ec08414f9e7b3c3e19d92a93"
+        ],
+        "Left": 1411.2782064742958,
+        "Top": 279.5557350076117,
+        "Width": 314.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 332.5557350076117,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFB9F9E1"
+      },
+      {
+        "Id": "0cf3a015011b43aab2e9a770929cd2ff",
+        "Title": "ВХОДНЫЕ ДАННЫЕ",
+        "Nodes": [
+          "dc0b72d5be484dc79540eb94427ecbec"
+        ],
+        "Left": 1028.2778662375829,
+        "Top": 276.20705083066264,
+        "Width": 314.0,
+        "Height": 174.0,
+        "FontSize": 36.0,
+        "InitialTop": 372.20705083066264,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 86.0,
+        "Background": "#FFFFAA45"
+      },
+      {
+        "Id": "f6efb46b7f4d4b20a99c7676caa58199",
+        "Title": "ПРОЕКТ",
+        "Nodes": [
+          "2fa1defa991944c683bae455caaf2cba"
+        ],
+        "Left": 698.30850229875273,
+        "Top": 273.01418636457061,
+        "Width": 281.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 326.01418636457061,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FFA4E1FF"
+      },
+      {
+        "Id": "1d6200ae184149679d5f1993a7fb61ff",
+        "Title": "<Имя проекта>",
+        "Nodes": [
+          "b3e79b1cb866489489842b33a72b90dd"
+        ],
+        "Left": 375.01623758926871,
+        "Top": 269.90914484735879,
+        "Width": 288.0,
+        "Height": 131.0,
+        "FontSize": 36.0,
+        "InitialTop": 322.90914484735879,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 43.0,
+        "Background": "#FF48B9FF"
+      },
+      {
+        "Id": "70d05dffb01c4361a063fe240ba2291f",
+        "Title": "Расчет",
+        "Nodes": [
+          "11a53809c91847adb18a92e6841ffa47"
+        ],
+        "Left": 1397.6521335561126,
+        "Top": 766.85495360600453,
+        "Width": 144.0,
+        "Height": 134.0,
+        "FontSize": 14.0,
+        "InitialTop": 796.85495360600453,
+        "InitialHeight": 145.0,
+        "TextblockHeight": 20.0,
+        "Background": "#FF848484"
+      },
+      {
+        "Id": "56bd254064e44ba491470c679de260ce",
+        "Title": "Используйте этот цвет группы для узлов, применяемых с целью создания элементов Revit.\r\n",
+        "Nodes": [],
+        "Left": 2192.9720627483121,
+        "Top": 326.78197747208515,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "14c51851ec08414f9e7b3c3e19d92a93",
+        "Title": "Используйте этот цвет группы для узлов Python и других узлов, связанных со сценарием.\r\n",
+        "Nodes": [],
+        "Left": 1421.2782064742958,
+        "Top": 332.5557350076117,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "2b696b60e6ac42ce860863c23c5d0e88",
+        "Title": "Используйте этот цвет группы для узлов, применяемых с целью импорта геометрии.\r\n",
+        "Nodes": [],
+        "Left": 1814.0713109425421,
+        "Top": 328.20405472045559,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "dc0b72d5be484dc79540eb94427ecbec",
+        "Title": "Используйте этот цвет группы для входных данных программ (регуляторы, блоки кода и т.д.).\r\n",
+        "Nodes": [],
+        "Left": 1038.2778662375829,
+        "Top": 372.20705083066264,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "2fa1defa991944c683bae455caaf2cba",
+        "Title": "Используйте этот цвет группы для функций программы.\r\n",
+        "Nodes": [],
+        "Left": 708.30850229875273,
+        "Top": 326.01418636457061,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      },
+      {
+        "Id": "b3e79b1cb866489489842b33a72b90dd",
+        "Title": "Описание проекта и назначение программы Dynamo\r\n",
+        "Nodes": [],
+        "Left": 385.01623758926871,
+        "Top": 322.90914484735879,
+        "Width": 0.0,
+        "Height": 0.0,
+        "FontSize": 36.0,
+        "InitialTop": 0.0,
+        "InitialHeight": 0.0,
+        "TextblockHeight": 0.0,
+        "Background": "#FFC1D676"
+      }
+    ],
+    "X": 110.25217439059975,
+    "Y": -141.6511390796062,
+    "Zoom": 0.7501776225935004
+  }
+}
