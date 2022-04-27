@@ -1,0 +1,664 @@
+{
+  "Uuid": "3c9d0464-8643-5ffe-96e5-ab1769818209",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "PGS_СС_МаркировкаОборудования",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [
+    {
+      "Id": "9495aaf91df74b9c85fddca497b94173",
+      "Name": "Марка по умолчанию",
+      "Type": "string",
+      "Value": "default",
+      "Description": "Создание строки."
+    },
+    {
+      "Id": "fa662416bdc84008ac76ba6c756eae4f",
+      "Name": "N1",
+      "Type": "number",
+      "Value": "1",
+      "MaximumValue": 100.0,
+      "MinimumValue": 1.0,
+      "StepValue": 1.0,
+      "NumberType": "Integer",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "Id": "c81ba4b90ea640ed86903237c12f334b",
+      "Name": "N2",
+      "Type": "number",
+      "Value": "1",
+      "MaximumValue": 100.0,
+      "MinimumValue": 1.0,
+      "StepValue": 1.0,
+      "NumberType": "Integer",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "Id": "54bbf5a3042f48838e4e045b4c41f473",
+      "Name": "N3",
+      "Type": "number",
+      "Value": "1",
+      "MaximumValue": 1000.0,
+      "MinimumValue": 1.0,
+      "StepValue": 1.0,
+      "NumberType": "Integer",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "Id": "277f7ee883ac43eb966e9d8887044021",
+      "Name": "Описание скрипта",
+      "Type": "string",
+      "Value": "    Скрипт сделан для заполнения параметра \"Марка\" у элементов раздела СС в формате: AAAn1.n2.n3 . Наличие буквенного значения, n1, n2 также задается. Присутствует функция назначения стартового значения n3. Значения n1, n2 задаются в ручную.\r\n\r\n    Из параметра \"ADSK_Позиция\" (из типа или экземпляра) берется значение AAA, если параметр отсутствует и в типе и в экземпляре, то берется значение default. \r\n    Если параметр \"ADSK_Позиция\" не будет заполнен, тоберется пустая строка.",
+      "Description": "Создание строки."
+    },
+    {
+      "Id": "a21981e8236b443898414e9d3700ae52",
+      "Name": "Наличие букв",
+      "Type": "boolean",
+      "Value": "true",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "Id": "b05ab8b300a3437f8cfc6b011126daca",
+      "Name": "Наличие n1",
+      "Type": "boolean",
+      "Value": "true",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "Id": "040a6c049687430eafad6c5ce1f60145",
+      "Name": "Наличие n2",
+      "Type": "boolean",
+      "Value": "true",
+      "Description": "Выбор между значениями true и false."
+    }
+  ],
+  "Outputs": [
+    {
+      "Id": "50325fe9e1d040bc93cc1a7e9a2c6bc5",
+      "Name": "Назначение марки элементам",
+      "Type": "unknown",
+      "InitialValue": "",
+      "Description": "Выполнение встроенного сценария Python."
+    }
+  ],
+  "Nodes": [
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "NodeType": "StringInputNode",
+      "InputValue": "default",
+      "Id": "9495aaf91df74b9c85fddca497b94173",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "06c04e521f994ea290d53c27e64cdba3",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Создание строки."
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "import clr\r\nclr.AddReference('ProtoGeometry')\r\nfrom Autodesk.DesignScript.Geometry import *\r\n# Import ToDSType(bool) extension method\r\nclr.AddReference(\"RevitNodes\")\r\nimport Revit\r\nclr.ImportExtensions(Revit.Elements)\r\n# Import geometry conversion extension methods\r\nclr.ImportExtensions(Revit.GeometryConversion)\r\n# Import DocumentManager and TransactionManager\r\nclr.AddReference(\"RevitServices\")\r\nimport RevitServices\r\nfrom RevitServices.Persistence import DocumentManager\r\nfrom RevitServices.Transactions import TransactionManager\r\nfrom System.Collections.Generic import *\r\n# Import RevitAPI\r\nclr.AddReference(\"RevitAPI\")\r\nimport Autodesk\r\nfrom Autodesk.Revit.DB import *\r\n\r\ndoc = DocumentManager.Instance.CurrentDBDocument\r\n\r\n# Выбранные элементы\r\nelements = UnwrapElement(IN[0])\r\n\r\n_parameter = IN[1] # Название параметра \"ADSK_Позиция\"\r\n_default = IN[2] # Текстовое значение вместо ADSK_Позиция по умолчанию\r\n\r\n_n1 = IN[3] # Значение первой цифры n1\r\n_n2 = IN[4] # Значение второй цифры n2\r\n_n3 = IN[5] # Стартовый номер n3\r\n\r\nn3 = [] # Массив номеров оборудования\r\n\r\nisText = IN[7] # Добавлять ли \r\nisN1 = IN[8]\r\nisN2 = IN[9]\r\n\r\n# Вывод результата заполнения марок элементов\r\ntypes = [] # Буквенное обозначение извещателя\r\nmarks = [] # Список итоговых марок оборудования\r\n\r\nlistCountOfAddresses = [] # Список количеств занимаемх адресов\r\n_parameterAddress = IN[6] # Название параметра \"RBZ_Количество занимаемых адресов\"\r\n\r\n# Заполнение списка типов извещателей\r\nfor element in elements:\r\n\tvalue = \"\"\r\n\tif (element.LookupParameter(_parameter) == None):\r\n\t\ttry:\r\n\t\t\tvalue = doc.GetElement(element.GetTypeId()).LookupParameter(_parameter).AsValueString()\r\n\t\texcept AttributeError:\r\n\t\t\tvalue = _default\r\n\telse:\r\n\t\tvalue = element.LookupParameter(_parameter).AsValueString()\r\n\ttypes.append(value)\r\n\r\n# Заполнение списка количеств занимаемых адресов\r\nfor element in elements:\r\n\tvalue = 1\r\n\tif (element.LookupParameter(_parameterAddress) == None):\r\n\t\ttry:\r\n\t\t\tvalue = doc.GetElement(element.GetTypeId()).LookupParameter(_parameterAddress).AsDouble()\r\n\t\texcept AttributeError:\r\n\t\t\tvalue = 1\r\n\telse:\r\n\t\tvalue = element.LookupParameter(_parameter).AsDouble()\r\n\tlistCountOfAddresses.append(value)\r\n\r\n\r\n# Заполнение списка значений n3 для назначения элементам\r\ni = 0\r\nj = _n3\r\nwhile i < len(types):\r\n\t_s = str(int(j))\r\n\tif listCountOfAddresses[i] > 1:\r\n\t\t_s += \"..\" + str(int(j + listCountOfAddresses[i] - 1))\r\n\tn3.append(_s)\r\n\tj += listCountOfAddresses[i]\r\n\ti += 1\r\n\r\n# Заполнение списка марок для назначения элементам\r\ni = 0\r\nwhile i < len(types):\r\n\t_s = \"\"\r\n\tif (isText):\r\n\t\t_s += str(types[i]) + \" \"\r\n\tif (isN1):\r\n\t\t_s += str(_n1) + \".\"\r\n\tif (isN2):\r\n\t\t_s += str(_n2) + \".\"\r\n\t_s += str(n3[i])\r\n\tmarks.append(_s)\r\n\ti += 1\r\n\r\nTransactionManager.Instance.EnsureInTransaction(doc)\r\nout = []\r\ni = 0\r\nwhile i < len(elements):\r\n\ttry:\r\n\t\telements[i].LookupParameter(\"Марка\").Set(marks[i])\r\n\t\tout.append(marks[i])\r\n\texcept AttributeError:\r\n\t\tout.append(\"У элемента нет Марки\")\r\n\ti += 1\r\nTransactionManager.Instance.TransactionTaskDone()\r\n\r\n\r\nOUT = types, listCountOfAddresses, marks, out",
+      "Engine": "IronPython2",
+      "VariableInputPorts": true,
+      "Id": "50325fe9e1d040bc93cc1a7e9a2c6bc5",
+      "Inputs": [
+        {
+          "Id": "ae7573c0766842ff8dbe845864e8c3e3",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "4a4b1a425bfd438487c44d979a9aa79b",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "f71aa55de0224857a6cb5d3ecfcd964e",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "6126a02165fb44e5813e5d46b997b13d",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "87c141ef0e4343b6a0386ceb67dec16b",
+          "Name": "IN[4]",
+          "Description": "Input #4",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "33b53c13d33543c686f177dbec057426",
+          "Name": "IN[5]",
+          "Description": "Input #5",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "dbb88cc2826e42f79743598f0bd6ba7f",
+          "Name": "IN[6]",
+          "Description": "Input #6",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "3da0ec6fd00a433c9e2c464fcd52e375",
+          "Name": "IN[7]",
+          "Description": "Input #7",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "0e27ac86f35a4ed6a09b01b0a10e453e",
+          "Name": "IN[8]",
+          "Description": "Input #8",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "f5081d9c2a7a433f837181319b5c2ea5",
+          "Name": "IN[9]",
+          "Description": "Input #9",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "67a23f6ceb314b7681301d1d8c28034d",
+          "Name": "OUT",
+          "Description": "Результат сценария Python",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выполнение встроенного сценария Python."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "\"ADSK_Позиция\";",
+      "Id": "f456ae594cbb4b359f6f667ee2b823bd",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "e39ddf42234b4a68be4ab4a06188c359",
+          "Name": "",
+          "Description": "Значение выражения в строке 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Обеспечивает возможность непосредственного авторства кода DesignScript"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 1,
+      "MaximumValue": 100,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "fa662416bdc84008ac76ba6c756eae4f",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "39b3703eef3f41ab96a50b39a7994b2a",
+          "Name": "",
+          "Description": "Int64",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 1,
+      "MaximumValue": 100,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "c81ba4b90ea640ed86903237c12f334b",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "9c815debd59444ef8f2b6777b87267bf",
+          "Name": "",
+          "Description": "Int64",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.IntegerSlider, CoreNodeModels",
+      "NodeType": "NumberInputNode",
+      "NumberType": "Integer",
+      "InputValue": 1,
+      "MaximumValue": 1000,
+      "MinimumValue": 1,
+      "StepValue": 1,
+      "Id": "54bbf5a3042f48838e4e045b4c41f473",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "a9f178268d904941b057c11be24c9271",
+          "Name": "",
+          "Description": "Int64",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Регулятор, создающий целые значения."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "NodeType": "StringInputNode",
+      "InputValue": "    Скрипт сделан для заполнения параметра \"Марка\" у элементов раздела СС в формате: AAAn1.n2.n3 . Наличие буквенного значения, n1, n2 также задается. Присутствует функция назначения стартового значения n3. Значения n1, n2 задаются в ручную.\r\n\r\n    Из параметра \"ADSK_Позиция\" (из типа или экземпляра) берется значение AAA, если параметр отсутствует и в типе и в экземпляре, то берется значение default. \r\n    Если параметр \"ADSK_Позиция\" не будет заполнен, тоберется пустая строка.",
+      "Id": "277f7ee883ac43eb966e9d8887044021",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "ba15963d5a0a4352898e4e844ca8c868",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Создание строки."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "\"RBZ_Количество занимаемых адресов\";",
+      "Id": "24e4032aaad74e58866e2780521b226c",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "88060f3a51154a3698696db949335af3",
+          "Name": "",
+          "Description": "Значение выражения в строке 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Обеспечивает возможность непосредственного авторства кода DesignScript"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "a21981e8236b443898414e9d3700ae52",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "36badbdf5ca14dae9fb6008f23d54548",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "b05ab8b300a3437f8cfc6b011126daca",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "36d37f0d2f3c4c5c94ccd44f9ee0541c",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": true,
+      "Id": "040a6c049687430eafad6c5ce1f60145",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "c5574dda297242ed94b10f1b2e92eba0",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Выбор между значениями true и false."
+    },
+    {
+      "ConcreteType": "Dynamo.Nodes.DSModelElementsSelection, DSRevitNodesUI",
+      "NodeType": "ExtensionNode",
+      "InstanceId": [],
+      "Id": "e2ad97371c6d411c9478ca7a079ddbbf",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "aa84f11868014b6daba62dbc74731f16",
+          "Name": "Elements",
+          "Description": "Выбранные элементы.",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled"
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "06c04e521f994ea290d53c27e64cdba3",
+      "End": "f71aa55de0224857a6cb5d3ecfcd964e",
+      "Id": "458d1122c749420eb7744199a1c445d5"
+    },
+    {
+      "Start": "e39ddf42234b4a68be4ab4a06188c359",
+      "End": "4a4b1a425bfd438487c44d979a9aa79b",
+      "Id": "91967fa69648469fa7b66a61759f16f8"
+    },
+    {
+      "Start": "39b3703eef3f41ab96a50b39a7994b2a",
+      "End": "6126a02165fb44e5813e5d46b997b13d",
+      "Id": "6d2d6890de404fc9942d10f10478c4ad"
+    },
+    {
+      "Start": "9c815debd59444ef8f2b6777b87267bf",
+      "End": "87c141ef0e4343b6a0386ceb67dec16b",
+      "Id": "96f99e24278f48fd84c7eb12a2b957ed"
+    },
+    {
+      "Start": "a9f178268d904941b057c11be24c9271",
+      "End": "33b53c13d33543c686f177dbec057426",
+      "Id": "a38be014cd664b608c7a27840a689f21"
+    },
+    {
+      "Start": "88060f3a51154a3698696db949335af3",
+      "End": "dbb88cc2826e42f79743598f0bd6ba7f",
+      "Id": "88255f98845543e9b2559f92c01a863b"
+    },
+    {
+      "Start": "36badbdf5ca14dae9fb6008f23d54548",
+      "End": "3da0ec6fd00a433c9e2c464fcd52e375",
+      "Id": "4acf77da2bb049f6876de67be601866e"
+    },
+    {
+      "Start": "36d37f0d2f3c4c5c94ccd44f9ee0541c",
+      "End": "0e27ac86f35a4ed6a09b01b0a10e453e",
+      "Id": "3fbeaada4df34d26bb5d200d7330a598"
+    },
+    {
+      "Start": "c5574dda297242ed94b10f1b2e92eba0",
+      "End": "f5081d9c2a7a433f837181319b5c2ea5",
+      "Id": "729cc98b55ee42f4b8db92926d096a71"
+    },
+    {
+      "Start": "aa84f11868014b6daba62dbc74731f16",
+      "End": "ae7573c0766842ff8dbe845864e8c3e3",
+      "Id": "eb6b03d6f77c43b1af7159564f6ccd92"
+    }
+  ],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.10.1.3976",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Фоновый просмотр",
+      "EyeX": 9.7211189270019531,
+      "EyeY": 30.425933837890625,
+      "EyeZ": 22.43768310546875,
+      "LookX": -14.721118927001953,
+      "LookY": -19.425933837890625,
+      "LookZ": -30.43768310546875,
+      "UpX": -0.13092674314975739,
+      "UpY": 0.9537169337272644,
+      "UpZ": -0.27070680260658264
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Марка по умолчанию",
+        "Id": "9495aaf91df74b9c85fddca497b94173",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1206.3259737644953,
+        "Y": 1223.9574566229699
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Назначение марки элементам",
+        "Id": "50325fe9e1d040bc93cc1a7e9a2c6bc5",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": true,
+        "Excluded": false,
+        "X": 216.15766989033614,
+        "Y": 1204.9910208295362
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "ADSK_Позиция",
+        "Id": "f456ae594cbb4b359f6f667ee2b823bd",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1200.7735784604147,
+        "Y": 1113.0244408140297
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "N1",
+        "Id": "fa662416bdc84008ac76ba6c756eae4f",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1239.8316352383085,
+        "Y": 1351.3251254699762
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "N2",
+        "Id": "c81ba4b90ea640ed86903237c12f334b",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1235.2041653086299,
+        "Y": 1442.4893085171889
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "N3",
+        "Id": "54bbf5a3042f48838e4e045b4c41f473",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1242.0157680983327,
+        "Y": 1625.433799402992
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Описание скрипта",
+        "Id": "277f7ee883ac43eb966e9d8887044021",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1197.6353271745693,
+        "Y": 331.95097911330765
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "ADSK_Позиция",
+        "Id": "24e4032aaad74e58866e2780521b226c",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1208.245138761521,
+        "Y": 1748.5831911353157
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Наличие букв",
+        "Id": "a21981e8236b443898414e9d3700ae52",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -988.415357938832,
+        "Y": 1859.3290814194393
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Наличие n1",
+        "Id": "b05ab8b300a3437f8cfc6b011126daca",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -976.41411273093934,
+        "Y": 1942.6700243565624
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Наличие n2",
+        "Id": "040a6c049687430eafad6c5ce1f60145",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -972.41369766164155,
+        "Y": 2033.6799860197048
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Выберите элементы в модели (рамкой выбора)",
+        "Id": "e2ad97371c6d411c9478ca7a079ddbbf",
+        "IsSetAsInput": true,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -1187.4648381871043,
+        "Y": 918.55319680381319
+      }
+    ],
+    "Annotations": [
+      {
+        "Id": "6f0e0ef8858a4218b41558e29f445c58",
+        "Title": "<Нажмите здесь, чтобы изменить заголовок группы>",
+        "Nodes": [
+          "9495aaf91df74b9c85fddca497b94173",
+          "f456ae594cbb4b359f6f667ee2b823bd",
+          "fa662416bdc84008ac76ba6c756eae4f",
+          "c81ba4b90ea640ed86903237c12f334b",
+          "54bbf5a3042f48838e4e045b4c41f473",
+          "277f7ee883ac43eb966e9d8887044021",
+          "24e4032aaad74e58866e2780521b226c",
+          "a21981e8236b443898414e9d3700ae52",
+          "b05ab8b300a3437f8cfc6b011126daca",
+          "040a6c049687430eafad6c5ce1f60145",
+          "e2ad97371c6d411c9478ca7a079ddbbf"
+        ],
+        "Left": -1252.0157680983327,
+        "Top": 191.95097911330765,
+        "Width": 445.55092991122842,
+        "Height": 1909.729006906397,
+        "FontSize": 36.0,
+        "InitialTop": 331.95097911330765,
+        "InitialHeight": 1846.7290069063972,
+        "TextblockHeight": 130.0,
+        "Background": "#FFFFAA45"
+      }
+    ],
+    "X": 1278.1944019726275,
+    "Y": -563.2425955991115,
+    "Zoom": 0.958166668001892
+  }
+}
